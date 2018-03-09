@@ -1,5 +1,6 @@
 ####svm
 library(caret)
+library(doParallel)
 data("segmentationData")
 set.seed(4321)
 sam = sample(2,
@@ -18,7 +19,8 @@ ctrl = trainControl(
   summaryFunction = twoClassSummary,
   verboseIter = T
 )
-
+registerDoParallel(6)		                        # Registrer a parallel backend for train
+getDoParWorkers()
 ##svmlinear
 grid = expand.grid(C = c(0.25, 0.5, 0.75, 1, 1, 1.25, 1.5))
 svmLin_mod = train(
@@ -62,11 +64,36 @@ svmPoly_mod = train(
 )
 
 ###  resample used to compare diff kernels
-comparsions=resamples(list(Poly=svmPoly_mod,radial=svmRad_mod,Linear=svmLin_mod))
+comparsions = resamples(list(
+  Poly = svmPoly_mod,
+  radial = svmRad_mod,
+  Linear = svmLin_mod
+))
 summary(comparsions)
-comparsions$values
-boxplot(comparsions)
+ 
+bwplot(comparsions, metric = "ROC")
+
+confusionMatrix(data=svmRad_mod,test$Class)
+xyplot(comparsions, what = "BlandAltman")
+summary(diff(comparsions))
 
 ###predict use the linear
-linear_Predict=predict(svmLin_mod,test)
-confusionMatrix(linear_Predict,test$Class,positive = 'WS')
+linear_Predict = predict(svmLin_mod, test)
+confusionMatrix(linear_Predict, test$Class)
+radioal_Predict=predict(svmRad_mod,test)
+confusionMatrix(radioal_Predict,test$Class)
+
+###
+# NOT RUN {
+cat(sprintf('%s backend is registered\n',
+            if(getDoParRegistered()) 'A' else 'No'))
+sprintf('Running with %d worker(s)\n', getDoParWorkers())
+(name <- getDoParName())
+(ver <- getDoParVersion())
+if (getDoParRegistered())
+  cat(sprintf('Currently using %s [%s]\n', name, ver))
+# }
+par(mfrow=c(3,1))
+plot(svmLin_mod)
+plot(svmRad_mod)
+plot(svmPoly_mod)
